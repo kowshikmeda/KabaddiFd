@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Calendar, MapPin, Users, Trophy, Search, Save, Camera } from 'lucide-react'; // Removed Cookie as it's not a Lucide icon
+import { Plus, X, Calendar, MapPin, Users, Trophy, Search, Save, Camera, Clock } from 'lucide-react'; // Added Clock icon
 import axios from 'axios';
 import { baseURL } from '../utils/constants';
-import Cookies from 'universal-cookie';
+
 import { useNavigate } from 'react-router-dom';
 import BackButton from './BackButton';
 
 const CreateMatch = () => {
-  const Cookie = new Cookies();
-  const token = Cookie.get('token');
+
   
   const [allPlayers, setAllPlayers] = useState([]);
   
+  // --- CHANGE 1: Add totalDuration to the initial state ---
   const [formData, setFormData] = useState({
     venue: '',
     date: '',
+    totalDuration: 40, // Default duration of 40 minutes
     team1: {
       name: '',
       logo: null,
@@ -31,7 +32,7 @@ const CreateMatch = () => {
   const [searchTerms, setSearchTerms] = useState({ team1: '', team2: '' });
   const [activeStep, setActiveStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
-  const [loading, setLoading] = useState(false); // New loading state
+  const [loading, setLoading] = useState(false);
   const userId = localStorage.getItem("user");
   const navigate = useNavigate();
 
@@ -41,34 +42,22 @@ const CreateMatch = () => {
 
   useEffect(() => {
     if (showPreview) {
-      console.log("Preview is visible. Setting a 10-second timer to navigate.");
       const timer = setTimeout(() => {
-        console.log("Timer finished. Navigating to /mymatches.");
         navigate('/mymatches');
       }, 10000); 
-
-      return () => {
-        console.log("Cleaning up the navigation timer.");
-        clearTimeout(timer);
-      };
+      return () => clearTimeout(timer);
     }
   }, [showPreview, navigate]); 
 
   const fetchPlayers = async () => {
     try {
-      const response = await axios.get(baseURL + '/users/all', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
+      const response = await axios.get(baseURL + '/users/all', { withCredentials:true });
       const playerPositions = ['raider', 'defender', 'all-rounder'];
-      const transformedPlayers = response.data.map(user => ({
+      const transformedPlayers = response.data.data.map(user => ({
         id: user.playerId,
         name: user.playerName,
         position: playerPositions[Math.floor(Math.random() * playerPositions.length)]
       }));
-      
       setAllPlayers(transformedPlayers);
     } catch (error) {
       console.error("Failed to fetch players:", error);
@@ -128,10 +117,12 @@ const CreateMatch = () => {
     return new Date().toISOString().slice(0, 10);
   };
 
+  // --- CHANGE 2: Add validation for totalDuration ---
   const validateForm = () => {
     const errors = [];
     if (!formData.venue) errors.push('Venue is required');
     if (!formData.date) errors.push('Date is required');
+    if (!formData.totalDuration || formData.totalDuration < 1) errors.push('Match duration must be a positive number');
     if (!formData.team1.name) errors.push('Team 1 name is required');
     if (!formData.team2.name) errors.push('Team 2 name is required');
     if (formData.team1.players.length < 7) errors.push('Team 1 must have at least 7 players');
@@ -140,16 +131,15 @@ const CreateMatch = () => {
   };
 
   const handleSubmit = async () => {
-    setLoading(true); // Set loading to true when submission starts
+    setLoading(true);
     const errors = validateForm();
     if (errors.length > 0) {
       alert('Please fix the following errors:\n' + errors.join('\n'));
-      setLoading(false); // Reset loading if validation fails
+      setLoading(false);
       return;
     }
 
     const apiFormData = new FormData();
-    apiFormData.append('matchName', `${formData.team1.name} vs ${formData.team2.name}`);
     apiFormData.append('team1Name', formData.team1.name);
     apiFormData.append('team2Name', formData.team2.name);
     if (formData.team1.logo) {
@@ -158,7 +148,6 @@ const CreateMatch = () => {
     if (formData.team2.logo) {
       apiFormData.append('team2Photo', formData.team2.logo);
     }
-    apiFormData.append('createdBy', userId);
     
     formData.team1.players.forEach(player => {
       apiFormData.append('team1Players', player.id);
@@ -167,23 +156,26 @@ const CreateMatch = () => {
     formData.team2.players.forEach(player => {
       apiFormData.append('team2Players', player.id);
     });
-    apiFormData.append('totalDuration', 5);
-    apiFormData.append('location', formData.venue);
-    apiFormData.append('matchDate', formData.date);
+    
+    // --- CHANGE 3: Append totalDuration to the form data ---
+    // The backend will handle converting this to seconds for remainingDuration
+    apiFormData.append('totalDuration', formData.totalDuration);
+    
+    apiFormData.append('venue', formData.venue);
+    apiFormData.append('matchDate', new Date(formData.date).toISOString());
 
     try {
       await axios.post(baseURL + '/matches/create', apiFormData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
-        }
+        }, withCredentials:true
       });
       setShowPreview(true);
     } catch (error) {
       console.error("Failed to create match:", error);
       alert(`Error creating match: ${error.response ? error.response.data.message : error.message}`);
     } finally {
-      setLoading(false); // Reset loading when API call completes (success or failure)
+      setLoading(false);
     }
   };
 
@@ -208,7 +200,6 @@ const CreateMatch = () => {
         <h2 className="text-2xl font-bold text-white mb-6">
           {teamKey === 'team1' ? 'Team 1 Details' : 'Team 2 Details'}
         </h2>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
             <label className="block text-gray-300 font-medium mb-2">Team Name</label>
@@ -233,7 +224,6 @@ const CreateMatch = () => {
             <input id={`${teamKey}-logo-upload`} type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoChange(teamKey, e)} />
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
             <h3 className="text-xl font-bold text-white mb-4">Available Players</h3>
@@ -259,7 +249,6 @@ const CreateMatch = () => {
               ))}
             </div>
           </div>
-
           <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
             <h3 className="text-xl font-bold text-white mb-4">Current Squad ({currentTeamPlayers.length})</h3>
              <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -283,7 +272,7 @@ const CreateMatch = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
         <BackButton/>
-        <div className="container mx-auto max-w-4xl">
+        <div className="container mx-auto max-w-4xl mt-5">
           <div className="bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 overflow-hidden">
             <div className="bg-gradient-to-r from-green-500/20 to-teal-500/20 p-6 border-b border-white/10 flex items-center justify-between">
               <div>
@@ -295,9 +284,11 @@ const CreateMatch = () => {
             <div className="p-8">
               <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10">
                   <h3 className="text-xl font-bold text-white mb-4">Match Information</h3>
-                  <div className="grid grid-cols-2 gap-4 text-gray-300">
+                  {/* --- CHANGE 4: Display duration on the preview screen --- */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-gray-300">
                     <div><span className="text-orange-400">Venue:</span> {formData.venue}</div>
                     <div><span className="text-orange-400">Date:</span> {formData.date}</div>
+                    <div><span className="text-orange-400">Duration:</span> {formData.totalDuration} mins</div>
                   </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -328,7 +319,7 @@ const CreateMatch = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <BackButton/>
-      <div className="container mx-auto max-w-6xl">
+      <div className="container mx-auto max-w-6xl mt-5">
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
             Create Kabaddi Match
@@ -351,7 +342,7 @@ const CreateMatch = () => {
           {activeStep === 1 && (
             <div className="p-8">
               <h2 className="text-2xl font-bold text-white mb-6">Match Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <label className="block text-gray-300 font-medium mb-2">Venue</label>
                   <select value={formData.venue} onChange={(e) => handleInputChange('venue', e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500">
@@ -363,6 +354,17 @@ const CreateMatch = () => {
                   <label className="block text-gray-300 font-medium mb-2">Date</label>
                   <input type="date" value={formData.date} min={getTodayString()} onChange={(e) => handleInputChange('date', e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500" />
                 </div>
+              </div>
+              {/* --- CHANGE 5: Add the duration input field to the UI --- */}
+              <div>
+                  <label className="block text-gray-300 font-medium mb-2">Match Duration (minutes)</label>
+                  <input 
+                    type="number"
+                    value={formData.totalDuration} 
+                    min="1"
+                    onChange={(e) => handleInputChange('totalDuration', parseInt(e.target.value, 10))} 
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500" 
+                  />
               </div>
             </div>
           )}
@@ -376,9 +378,11 @@ const CreateMatch = () => {
               <div className="space-y-6">
                 <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
                   <h3 className="text-xl font-bold text-white mb-4">Match Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-300">
+                  {/* --- CHANGE 6: Display duration on the review screen --- */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-gray-300">
                     <div><span className="text-orange-400">Venue:</span> {formData.venue || 'Not set'}</div>
                     <div><span className="text-orange-400">Date:</span> {formData.date || 'Not set'}</div>
+                    <div><span className="text-orange-400">Duration:</span> {formData.totalDuration} mins</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -416,7 +420,7 @@ const CreateMatch = () => {
               ) : (
                 <button 
                   onClick={handleSubmit} 
-                  disabled={loading} // Disable button when loading
+                  disabled={loading}
                   className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white px-8 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (

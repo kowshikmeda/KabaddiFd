@@ -7,40 +7,38 @@ import Cookies from 'universal-cookie';
 import BackButton from './BackButton';
 
 const UserProfile = () => {
-  const cookies = new Cookies();
-  const token = cookies.get('token');
+ 
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState(null);
   const [tempData, setTempData] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
-  const [loading, setLoading] = useState(true); // Single loading state for all async ops
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const userId = localStorage.getItem('user');
 
-  // Effect for fetching user data on component mount
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        setLoading(true); // Start loading when fetching
-        setError(null); // Clear any previous errors
+        setLoading(true);
+        setError(null);
 
         const response = await axios.get(baseURL + `/users/userdetails/${userId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+         withCredentials: true,
         });
-        const data = response.data;
-
+        const data = response.data.data;
+        
+        // --- FIX 1: Ensure all form fields are initialized with a non-undefined value ---
+        // Use `|| ''` to provide an empty string fallback for any optional fields.
         const formattedData = {
-          name: data.name,
-          username: data.username,
-          password: '', // Do NOT store actual password from API. Use empty string for edit field.
-          phone: data.phone,
-          location: data.location,
+          name: data.name || '',
+          username: data.email || '',
+          password: '',
+          phone: data.phone || '',
+          location: data.location || '',
           joinDate: data.createdAt,
-          bio: data.about,
-          avatar: data.url,
+          bio: data.about || '',
+          avatar: data.photo || null, // Avatar can be null if none exists
           height: data.height || '',
           weight: data.weight || '',
           age: data.age || '',
@@ -52,29 +50,33 @@ const UserProfile = () => {
         setError('Failed to fetch user profile.');
         console.error(err);
       } finally {
-        setLoading(false); // End loading when fetch completes
+        setLoading(false);
       }
     };
 
-    fetchUserData();
-  }, [userId, token]); // Dependencies for useEffect
+    if (userId) {
+        fetchUserData();
+    } else {
+        setError("No user ID found.");
+        setLoading(false);
+    }
+  }, [userId]);
 
   const handleEdit = () => {
-    // Reset password field in tempData, as we don't store it from API
     setTempData({ ...profileData, password: '' });
     setAvatarPreview(null);
     setIsEditing(true);
-    setError(null); // Clear errors when starting to edit
+    setError(null);
   };
 
   const handleSave = async () => {
-    setLoading(true); // Start loading when saving
-    setError(null); // Clear any previous errors
+    setLoading(true);
+    setError(null);
 
     const updatePayload = new FormData();
 
+    // Append all fields from the tempData state
     updatePayload.append('name', tempData.name);
-    updatePayload.append('username', tempData.username);
     updatePayload.append('phone', tempData.phone);
     updatePayload.append('location', tempData.location);
     updatePayload.append('about', tempData.bio);
@@ -82,48 +84,53 @@ const UserProfile = () => {
     updatePayload.append('weight', tempData.weight);
     updatePayload.append('age', tempData.age);
 
-    // Only append password if the field is not empty, implying a change
-    if (tempData.password !== '') {
+    if (tempData.password) {
       updatePayload.append("password", tempData.password);
     }
 
     if (tempData.avatar instanceof File) {
-      updatePayload.append('image', tempData.avatar);
+      // The key should match what your backend expects (e.g., 'photo', 'image', 'avatar')
+      updatePayload.append('photo', tempData.avatar);
     }
 
     try {
-      await axios.put(baseURL + `/users/user/update/${userId}`, updatePayload, {
+      // --- FIX 2: Use `withCredentials: true` for the PUT request to match the GET request ---
+      // Remove the explicit 'Authorization' header, as the cookie is sent automatically.
+      const response = await axios.put(baseURL + `/users/user/update/${userId}`, updatePayload, {
+        withCredentials: true,
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
         }
       });
+      
+      const updatedData = response.data.data;
 
-      // Update profileData. Avatar needs special handling.
-      // If a new file was uploaded, avatarPreview holds its URL. Otherwise, use existing.
-      // If a new file was selected but not yet uploaded, tempData.avatar is a File object.
-      // After successful upload, the backend should return the new URL. For client-side
-      // update, we can use avatarPreview or assume the old URL if no new file was selected.
-      const newAvatarUrl = avatarPreview || profileData.avatar;
+      // Create a fresh profile data object from the response to ensure UI is in sync
+      const newProfileData = {
+          ...tempData,
+          avatar: updatedData.photo || avatarPreview, // Prefer the URL from backend response
+          password: '' // Always clear password field after save
+      };
 
-      // Update the main profileData, but keep password empty as it's not truly stored client-side
-      setProfileData({ ...tempData, avatar: newAvatarUrl, password: '' });
+      setProfileData(newProfileData);
       setIsEditing(false);
       alert('Profile updated successfully!');
+
     } catch (err) {
-      setError('Failed to update profile. Please try again.');
+      const errorMessage = err.response?.data?.message || 'Failed to update profile. Please try again.';
+      setError(errorMessage);
       console.error(err);
-      alert(`Error: Could not update profile. ${err.response?.data?.message || err.message}`);
+      alert(`Error: ${errorMessage}`);
     } finally {
-      setLoading(false); // End loading when save completes
+      setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    setTempData({ ...profileData, password: '' }); // Reset password field on cancel
+    setTempData({ ...profileData, password: '' });
     setAvatarPreview(null);
     setIsEditing(false);
-    setError(null); // Clear errors on cancel
+    setError(null);
   };
 
   const handleInputChange = (field, value) => {
@@ -140,11 +147,9 @@ const UserProfile = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  // Initial loading state for fetching profile data
   if (loading && !profileData) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white text-xl">
       <Loader2 className="animate-spin h-10 w-10 mb-4 text-orange-500" />
@@ -152,26 +157,20 @@ const UserProfile = () => {
     </div>
   );
 
-  if (error && !loading) return <div className="min-h-screen flex items-center justify-center text-red-400 text-xl">{error}</div>;
-  if (!profileData && !loading) return <div className="min-h-screen flex items-center justify-center text-gray-400 text-xl">User not found.</div>;
+  if (error) return <div className="min-h-screen flex items-center justify-center text-red-400 text-xl">{error}</div>;
+  if (!profileData) return <div className="min-h-screen flex items-center justify-center text-gray-400 text-xl">User not found.</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <BackButton/>
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto mt-5">
         <div className="bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 overflow-hidden mt-3">
 
           <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 p-8 relative ">
             <div className="flex flex-col sm:flex-row items-center gap-8">
-
               <div className="relative group">
                 <div className="w-32 h-32 rounded-full ring-4 ring-white/20 overflow-hidden shadow-2xl">
-                  {/* Display avatar preview if available, otherwise current profile avatar */}
-                  <img
-                    src={avatarPreview || profileData.avatar}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={avatarPreview || profileData.avatar} alt="Profile" className="w-full h-full object-cover" />
                 </div>
                 {isEditing && (
                   <>
@@ -182,7 +181,6 @@ const UserProfile = () => {
                   </>
                 )}
               </div>
-
               <div className="text-center sm:text-left text-white flex-grow">
                 <h1 className="text-4xl font-bold mb-2">{isEditing ? tempData.name : profileData.name}</h1>
                 <div className="flex flex-wrap gap-4 justify-center sm:justify-start text-sm mt-4">
@@ -190,28 +188,13 @@ const UserProfile = () => {
                   <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full"><Calendar className="w-4 h-4 text-orange-400" /><span className="text-gray-300">Joined {formatDate(profileData.joinDate)}</span></div>
                 </div>
               </div>
-
               <div className="flex-shrink-0">
                 {!isEditing ? (
                   <button onClick={handleEdit} className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-semibold"><Edit2 className="w-5 h-5" />Edit Profile</button>
                 ) : (
                   <div className="flex gap-3">
-                    <button
-                      onClick={handleSave}
-                      disabled={loading} // Disable button while loading (saving)
-                      className="bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? ( // Show spinner if loading
-                        <>
-                          <Loader2 className="animate-spin w-4 h-4" />
-                          <span>Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          <span>Save</span>
-                        </>
-                      )}
+                    <button onClick={handleSave} disabled={loading} className="bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                      {loading ? (<><Loader2 className="animate-spin w-4 h-4" /><span>Saving...</span></>) : (<><Save className="w-4 h-4" /><span>Save</span></>)}
                     </button>
                     <button onClick={handleCancel} disabled={loading} className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg flex items-center gap-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"><X className="w-4 h-4" />Cancel</button>
                   </div>
@@ -222,7 +205,6 @@ const UserProfile = () => {
 
           <div className="p-8">
             <div className="grid lg:grid-cols-3 gap-8">
-
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-white">Contact & Security</h2>
                 <div className="space-y-4">
@@ -234,9 +216,9 @@ const UserProfile = () => {
                         <label className="block text-sm font-semibold text-gray-400 mb-2 capitalize">{field}</label>
                         {isEditing ? (
                           <input
-                            // Since username is often an email, we keep type='email' for browser validation
                             type={field === 'username' ? 'email' : field === 'password' ? 'password' : 'text'}
-                            value={tempData[field]}
+                            // Use `tempData[field]` which is guaranteed to be a string
+                            value={tempData ? tempData[field] : ''}
                             placeholder={field === 'password' ? 'Leave blank to keep current' : ''}
                             onChange={(e) => handleInputChange(field, e.target.value)}
                             className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -268,7 +250,7 @@ const UserProfile = () => {
                         {isEditing ? (
                           <input
                             type="number"
-                            value={tempData[field]}
+                            value={tempData ? tempData[field] : ''}
                             onChange={(e) => handleInputChange(field, e.target.value)}
                             className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                           />
@@ -285,7 +267,7 @@ const UserProfile = () => {
                  <h2 className="text-2xl font-bold text-white">About Me</h2>
                  {isEditing ? (
                     <textarea
-                      value={tempData.bio}
+                      value={tempData ? tempData.bio : ''}
                       onChange={(e) => handleInputChange('bio', e.target.value)}
                       rows="12"
                       className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"

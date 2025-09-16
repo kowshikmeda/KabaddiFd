@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { Lock, User, Loader2 } from 'lucide-react'; // Import Loader2 for the spinner icon
 import { baseURL } from '../utils/constants';
 import axios from 'axios';
-import Cookies from 'universal-cookie';
+
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false); // New loading state
-  const cookies = new Cookies();
+ 
   const navigate = useNavigate();
 
   const handleSubmit = async (event) => {
@@ -18,13 +18,13 @@ const Login = () => {
 
     try {
       const response = await axios.post(baseURL + '/auth/login', {
-        username: email, // Changed from email to username as per your API structure
+         email, // Changed from email to username as per your API structure
         password,
-      });
+      },{withCredentials: true});
 
-      localStorage.setItem('user', response.data.user);
+      localStorage.setItem('user', response.data.data.user.id);
       alert('Login successful!');
-      cookies.set('token', response.data.token);
+     
       console.log('Server response:', response.data);
       navigate("/");
 

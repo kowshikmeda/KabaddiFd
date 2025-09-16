@@ -10,87 +10,82 @@ const ScoreCard = () => {
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [remainingTime, setRemainingTime] = useState(0); // New state for ticking timer
-  const [matchName, setMatchName] = useState(''); // New state for match name
+  const [remainingTime, setRemainingTime] = useState(0);
+  const [matchName, setMatchName] = useState('');
   const { matchId } = useParams();
   const navigate = useNavigate();
-  const timerRef = useRef(null); // Ref to hold the interval ID
+  const timerRef = useRef(null);
 
   const formatTimeFromSeconds = (totalSeconds) => {
     if (isNaN(totalSeconds) || totalSeconds < 0) {
       return "00:00";
     }
-
     const minutes = Math.floor(totalSeconds / 60);
     const remainingSeconds = Math.floor(totalSeconds % 60);
-
     const paddedMinutes = String(minutes).padStart(2, '0');
     const paddedSeconds = String(remainingSeconds).padStart(2, '0');
-
     return `${paddedMinutes}:${paddedSeconds}`;
   };
 
   useEffect(() => {
     const fetchMatchData = async () => {
-      const id = matchId || '68aee36d66f3dabbe87e76fb'; // Fallback for testing
+      // Use the matchId from URL params, with a fallback for testing if needed
+      const id = matchId || '68aee36d66f3dabbe87e76fb';
 
       try {
         setLoading(true);
-        const response = await axios.get(baseURL + `/matchstats/match/scorecard/${id}`);
-        const apiData = response.data;
-        console.log("Fetched Match Data:", apiData);
+        const response = await axios.get(`${baseURL}/matchstats/match/scorecard/${id}`);
+        const apiData = response.data.data;
 
         const transformPlayers = (players) =>
-          players.map(p => ({
-            id: p.playerId,
-            name: p.playerName,
-            raidPoints: p.raidPoints,
-            tacklePoints: p.tacklePoints,
-            totalPoints: p.raidPoints + p.tacklePoints,
+          (players || []).map(p => ({
+            id: p.playerId._id,
+            name: p.playerId.name,
+            raidPoints: p.raidPoints || 0,
+            tacklePoints: p.tacklePoints || 0,
+            totalPoints: (p.raidPoints || 0) + (p.tacklePoints || 0),
           }));
 
         const team1Players = transformPlayers(apiData.team1);
         const team2Players = transformPlayers(apiData.team2);
 
         const transformedData = {
-          id: apiData.matchId,
-          matchName: apiData.matchName || "Kabaddi Match", // Get match name from API
+          id: apiData.matchId._id,
+          matchName: `${apiData.team1Name} vs ${apiData.team2Name}`,
           team1: {
             name: apiData.team1Name,
-            photo: `https://ui-avatars.com/api/?name=${apiData.team1Name.split(' ').join('+')}&background=random`,
-            score: team1Players.reduce((sum, p) => sum + p.totalPoints, 0),
+            photo: apiData.matchId.team1Photo || `https://ui-avatars.com/api/?name=${apiData.team1Name.split(' ').join('+')}&background=random`,
+            // --- FIX: Use the score directly from the API response ---
+            score: apiData.matchId?.team1Score || 0,
             players: team1Players,
           },
           team2: {
             name: apiData.team2Name,
-            photo: `https://ui-avatars.com/api/?name=${apiData.team2Name.split(' ').join('+')}&background=random`,
-            score: team2Players.reduce((sum, p) => sum + p.totalPoints, 0),
+            photo: apiData.matchId.team2Photo || `https://ui-avatars.com/api/?name=${apiData.team2Name.split(' ').join('+')}&background=random`,
+            // --- FIX: Use the score directly from the API response ---
+            score: apiData.matchId?.team2Score || 0,
             players: team2Players,
           },
-          status: apiData.status,
-          time: formatTimeFromSeconds(apiData.remainingDuration) || "40:00", // Initial formatted time
-          remainingDuration: apiData.remainingDuration, // Store raw seconds for timer
-          venue: apiData.location || "Kabaddi Stadium",
-          date: apiData.createdAt || new Date().toISOString(),
+          status: (apiData.matchId.status || apiData.status).toUpperCase(), // Ensure status is uppercase for consistency
+          time: formatTimeFromSeconds(apiData.matchId.remainingDuration) || "40:00",
+          remainingDuration: apiData.matchId.remainingDuration,
+          venue: apiData.matchId.venue || "Kabaddi Stadium",
+          date: apiData.matchId.matchDate || new Date().toISOString(),
         };
 
         setMatch(transformedData);
-        setMatchName(transformedData.matchName); // Set match name
-        setRemainingTime(transformedData.remainingDuration); // Initialize ticking timer with backend value
-        
-        // Clear any existing timer before starting a new one
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-        }
+        setMatchName(transformedData.matchName);
+        setRemainingTime(transformedData.remainingDuration);
 
-        // Start timer if match is LIVE
+        if (timerRef.current) clearInterval(timerRef.current);
+
         if (transformedData.status === 'LIVE' && transformedData.remainingDuration > 0) {
           timerRef.current = setInterval(() => {
             setRemainingTime(prevTime => {
-              if (prevTime <= 1) { // Stop at 0 or below
+              if (prevTime <= 1) {
                 clearInterval(timerRef.current);
                 timerRef.current = null;
-                // Optionally refetch or update status to COMPLETED
+                // You might want to re-fetch data here to update the status to COMPLETED
                 return 0;
               }
               return prevTime - 1;
@@ -108,35 +103,26 @@ const ScoreCard = () => {
 
     fetchMatchData();
 
-    // Cleanup interval on component unmount
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [matchId]); // Re-run effect if matchId changes
+  }, [matchId]);
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'LIVE': return 'bg-red-500 text-white animate-pulse';
       case 'COMPLETED': return 'bg-green-500 text-white';
-      case 'FINISHED': return 'bg-green-500 text-white';
+      case 'PAUSED': return 'bg-yellow-500 text-white';
       case 'UPCOMING': return 'bg-blue-500 text-white';
       default: return 'bg-gray-500 text-white';
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-900 flex items-center justify-center text-white text-xl">Loading Scorecard...</div>;
-  }
-  if (error) {
-    return <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-900 flex items-center justify-center text-red-400 text-xl">{error}</div>;
-  }
-  if (!match) {
-    return <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-900 flex items-center justify-center text-gray-400 text-xl">Match data not found.</div>;
-  }
+  if (loading) return <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-900 flex items-center justify-center text-white text-xl">Loading Scorecard...</div>;
+  if (error) return <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-900 flex items-center justify-center text-red-400 text-xl">{error}</div>;
+  if (!match) return <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-900 flex items-center justify-center text-gray-400 text-xl">Match data not found.</div>;
 
-  const winner = match.status === 'COMPLETED' || match.status === 'FINISHED'
+  const winner = match.status === 'COMPLETED'
     ? (match.team1.score > match.team2.score ? 'team1' :
       (match.team2.score > match.team1.score ? 'team2' : 'draw'))
     : null;
@@ -146,7 +132,8 @@ const ScoreCard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <BackButton/>
-      <div className="container mx-auto max-w-7xl space-y-8">
+      <div className="container mx-auto max-w-7xl space-y-8 mt-5">
+        {/* Header (no changes) */}
         <div className="flex items-center justify-between bg-white/5 backdrop-blur-lg rounded-2xl p-4 border border-white/10">
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-gradient-to-r from-orange-500 to-red-600 rounded-full shadow-lg">
@@ -158,25 +145,20 @@ const ScoreCard = () => {
           </div>
         </div>
 
+        {/* Match Info Panel (no changes) */}
         <div className="bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 overflow-hidden">
           <div className="p-8 border-b border-white/10">
-            {/* New Header Layout with 3 equally spaced columns */}
             <div className="flex justify-between items-center mb-4">
-                {/* Column 1: Match Status (Aligned Left) */}
                 <div className="flex-1 text-left">
                     <span className={`px-4 py-2 rounded-full text-sm font-bold ${getStatusColor(match.status)}`}>
                         {match.status}
                     </span>
                 </div>
-
-                {/* Column 2: Match Name (Centered, added this) */}
                 <div className="flex-1 text-center">
                     <h2 className="text-xl font-bold text-white tracking-wide">{matchName}</h2>
                 </div>
-
-                {/* Column 3: Live Timer (Aligned Right) */}
                 <div className="flex-1 text-right">
-                    {match.status === 'LIVE' && ( // Only show ticking timer for LIVE matches
+                    {match.status === 'LIVE' && (
                         <div className="inline-flex items-center gap-2 text-orange-400 font-mono text-lg bg-white/10 px-4 py-2 rounded-full">
                             <Clock className="w-5 h-5" />
                             <span>{formatTimeFromSeconds(remainingTime)}</span>
@@ -185,20 +167,17 @@ const ScoreCard = () => {
                     {(match.status === 'COMPLETED' || match.status === 'PAUSED' || match.status === 'UPCOMING') && (
                         <div className="inline-flex items-center gap-2 text-gray-300 font-mono text-lg bg-white/10 px-4 py-2 rounded-full">
                              <Clock className="w-5 h-5" />
-                            <span>{match.time}</span> {/* Display initial time for non-live matches */}
+                            <span>{match.time}</span>
                         </div>
                     )}
                 </div>
             </div>
-            
-            <div className="flex justify-center items-center mb-8"> {/* Adjusted margin for date/venue */}
+            <div className="flex justify-center items-center mb-8">
                 <div className="inline-flex items-center gap-2 text-sm text-gray-300">
                     <MapPin className="w-4 h-4" />
                     <span>{match.venue}, {new Date(match.date).toLocaleDateString()}</span>
                 </div>
             </div>
-
-
             <div className="flex items-center justify-around">
               <div className={`flex-1 text-center ${winner === 'team1' ? 'scale-105' : ''} transition-transform duration-300`}>
                 <div className="relative mb-3 inline-block">
@@ -208,13 +187,11 @@ const ScoreCard = () => {
                 <h3 className={`font-bold text-lg mb-2 ${winner === 'team1' ? 'text-yellow-400' : 'text-white'}`}>{match.team1.name}</h3>
                 <div className={`text-5xl font-bold ${winner === 'team1' ? 'text-yellow-400' : 'text-orange-400'}`}>{match.team1.score}</div>
               </div>
-
               <div className="px-4">
                 <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-full p-3">
                   <span className="text-white font-bold text-lg">VS</span>
                 </div>
               </div>
-
               <div className={`flex-1 text-center ${winner === 'team2' ? 'scale-105' : ''} transition-transform duration-300`}>
                 <div className="relative mb-3 inline-block">
                   <img src={match.team2.photo} alt={match.team2.name} className={`w-24 h-24 rounded-full mx-auto object-cover border-4 ${winner === 'team2' ? 'border-yellow-400' : 'border-white/20'}`} />
@@ -226,6 +203,7 @@ const ScoreCard = () => {
             </div>
           </div>
           
+          {/* Player Stats Section */}
           <div className="p-6 border-b border-white/10">
             <h3 className="text-xl font-bold text-white text-center mb-4">View Player Statistics</h3>
             <div className="flex bg-white/10 rounded-2xl p-2 max-w-md mx-auto">
@@ -251,7 +229,7 @@ const ScoreCard = () => {
 
             <div className="space-y-3">
               {currentTeamData.players.map((player, index) => (
-                <div key={index}  onClick={() => navigate(`/player/${player.id}`) } className="grid grid-cols-6 gap-4 items-center p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors duration-300">
+                <div key={player.id || index} onClick={() => navigate(`/player/${player.id}`)} className="grid grid-cols-6 gap-4 items-center p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors duration-300 cursor-pointer">
                   <div className="col-span-2 text-white font-semibold">{player.name}</div>
                   <div className="text-center"><span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-lg font-bold">{player.raidPoints}</span></div>
                   <div className="text-center"><span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-lg font-bold">{player.tacklePoints}</span></div>
@@ -279,7 +257,8 @@ const ScoreCard = () => {
                   <div className="text-gray-300 text-sm">Total Tackle Points</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-orange-400">{currentTeamData.players.reduce((sum, p) => sum + p.totalPoints, 0)}</div>
+                  {/* --- FIX: Display the correct team score from the state --- */}
+                  <div className="text-2xl font-bold text-orange-400">{currentTeamData.score}</div>
                   <div className="text-gray-300 text-sm">Team Total Points</div>
                 </div>
               </div>

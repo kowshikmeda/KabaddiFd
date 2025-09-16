@@ -110,15 +110,16 @@ const PlayerProfile = () => {
           axios.get(baseURL+`/users/user/${playerId}/profile`)
         ]);
 
-        const userData = userResponse.data;
-        const profileData = profileResponse.data;
-        
+        const userData = userResponse.data.data;
+        const profileData = profileResponse.data.data;
+        // console.log("user data",userData);
+        // console.log("profile data",profileData);
         // Transform the API data into the structure the UI expects
         const transformedData = {
           id: userData.id,
           name: userData.name,
           nickname: userData.about || "The Finisher", // Fallback nickname
-           photo: userData.url ,// || `https://ui-avatars.com/api/john}&background=random`,
+           photo: userData.photo ,// || `https://ui-avatars.com/api/john}&background=random`,
           team: "Team Name", // Placeholder as it's not in API
          // teamLogo: "https://via.placeholder.com/100", // Placeholder
           position: "Raider", // Placeholder
@@ -130,10 +131,10 @@ const PlayerProfile = () => {
           debut: new Date(profileData.debutMatch).getFullYear().toString(),
 
           careerStats: {
-            totalMatches: profileData.totalMatches,
-            totalPoints: profileData.totalPoints,
-            raidPoints: profileData.raidPoints,
-            tacklePoints: profileData.tacklePoints,
+            totalMatches: profileData.careerStats.totalMatches,
+            totalPoints: profileData.careerStats.totalPoints,
+            raidPoints: profileData.careerStats.raidPoints,
+            tacklePoints: profileData.careerStats.tacklePoints,
             // Calculate average points
             averagePoints: profileData.totalMatches > 0 ? (profileData.totalPoints / profileData.totalMatches).toFixed(1) : 0,
              // Calculate success rate as a percentage of total points
@@ -141,7 +142,7 @@ const PlayerProfile = () => {
           },
           
           // Transform recent matches data
-          lastFiveMatches: profileData.matches.slice(0, 5).map(match => {
+          lastFiveMatches: profileData.lastFiveMatches.map(match => {
             const isWin = match.team1Score > match.team2Score; // Assumption
             let performance = 'average';
             if (match.totalPoints >= 15) performance = 'excellent';
@@ -149,15 +150,15 @@ const PlayerProfile = () => {
             else if (match.totalPoints < 5) performance = 'poor';
 
             return {
-              date: new Date(match.matchDate).toISOString().split('T')[0],
-              opponent: match.oppositeTeamName,
-              venue: match.location,
-              result: isWin ? "Won" : "Lost",
-              score: `${match.team1Score}-${match.team2Score}`,
-              playerPoints: match.totalPoints,
-              raidPoints: match.raidPoints,
-              tacklePoints: match.tacklePoints,
-              performance: performance
+               date: match.date || "N/A",
+          opponent: match.opponent || "Unknown",
+          venue: match.venue || "Unknown",
+          result: match.result || "N/A",
+          score: match.score || "0-0",
+          playerPoints: match.playerPoints || 0,
+          raidPoints: match.raidPoints || 0,
+          tacklePoints: match.tacklePoints || 0,
+          performance: match.performance || "average"
             };
           })
         };
@@ -203,7 +204,7 @@ const PlayerProfile = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       <BackButton/>
-      <div className="container mx-auto max-w-7xl">
+      <div className="container mx-auto max-w-7xl mt-5" >
         
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">

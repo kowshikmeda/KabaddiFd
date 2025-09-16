@@ -30,11 +30,8 @@ const Signup = () => {
 
     const formData = new FormData();
     formData.append('name', name);
-    formData.append('username', email);
+    formData.append('email', email);
     formData.append('password', password);
-    formData.append('phone', "0000000000");
-    formData.append('location', "Not specified");
-    formData.append('about', "A new Kabaddi enthusiast!");
     formData.append('age', parseInt(age, 10) || 0);
     formData.append('height', parseFloat(height) || 0);
     formData.append('weight', parseFloat(weight) || 0);

@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Search, Trophy, Clock, MapPin, Flame, FileQuestion, ServerCrash, Frown, User, Plus, Shield, Sword, Loader2 } from 'lucide-react';
 import { baseURL } from '../utils/constants';
 import ProfileDropdown from './ProfileDropdown';
-import Cookies from 'universal-cookie';
+
 import BackButton from './BackButton';
 
 // Reusable ScoreCard display component with conditional navigation
@@ -64,8 +64,8 @@ const ScorecardDisplay = ({ match, activeTab }) => {
 
 
 const MyMatches = () => {
-  const cookies = new Cookies();
-  const token = cookies.get('token');
+  
+ 
   const [allMatches, setAllMatches] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -82,19 +82,19 @@ const MyMatches = () => {
         setAllMatches([]); // Clear previous matches when tab changes
 
         const endpoint = activeTab === 'created'
-          ? `/users/user/${user}/created-matches`
-          : `/users/user/${user}/played-matches`;
+          ? `/users/user/created-matches`
+          : `/users/user/played-matches`;
 
         try {
           const response = await axios.get(baseURL + endpoint, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            withCredentials: true,
           });
           console.log('Fetched matches:', response.data);
-          const transformedMatches = response.data.map(match => ({
-            id: match.id,
-            team1: { name: match.team1Name, score: match.team1Score, photo: match.team1PhotoUrl || `https://ui-avatars.com/api/?name=${match.team1Name.replace(/\s+/g, '+')}` },
-            team2: { name: match.team2Name, score: match.team2Score, photo: match.team2PhotoUrl || `https://ui-avatars.com/api/?name=${match.team2Name.replace(/\s+/g, '+')}` },
-            status: match.status, venue: match.location, date: match.createdAt, time: match.remainingDuration,
+          const transformedMatches = response.data.data.map(match => ({
+            id: match._id,
+            team1: { name: match.team1Name, score: match.team1Score, photo: match.team1Photo || `https://ui-avatars.com/api/?name=${match.team1Name.replace(/\s+/g, '+')}` },
+            team2: { name: match.team2Name, score: match.team2Score, photo: match.team2Photo || `https://ui-avatars.com/api/?name=${match.team2Name.replace(/\s+/g, '+')}` },
+            status: match.status, venue: match.venue, date: match.createdAt, time: match.remainingDuration,
           }));
 
           setAllMatches(transformedMatches);

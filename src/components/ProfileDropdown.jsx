@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, LogOut, UserCircle } from 'lucide-react';
+import { User, LogOut, UserCircle, BarChartIcon } from 'lucide-react';
 import Cookies from 'universal-cookie';
 const ProfileDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -84,6 +84,16 @@ const ProfileDropdown = () => {
             <UserCircle className="w-5 h-5" />
             <span>Profile</span>
           </Link>
+
+           <Link
+            to={`/player/${user}`}
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 w-full text-left px-4 py-2 rounded-lg text-sm text-gray-300 hover:bg-orange-500/20 hover:text-orange-400 transition-colors duration-200"
+          >
+            <BarChartIcon className="w-5 h-5" />
+            <span>My Stats</span>
+          </Link>
+
 
           {/* Logout Button (no change) */}
           <button
