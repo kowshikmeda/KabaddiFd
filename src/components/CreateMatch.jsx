@@ -343,13 +343,14 @@ const CreateMatch = () => {
             <div className="p-8">
               <h2 className="text-2xl font-bold text-white mb-6">Match Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-gray-300 font-medium mb-2">Venue</label>
-                  <select value={formData.venue} onChange={(e) => handleInputChange('venue', e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500">
-                    <option value="" className="bg-slate-800">Select Venue</option>
-                    {venues.map(venue => (<option key={venue} value={venue} className="bg-slate-800">{venue}</option>))}
-                  </select>
-                </div>
+               <div>
+  <label className="block text-gray-300 font-medium mb-2">Venue</label>
+  <input     type="text"    placeholder="Enter venue name"    value={formData.venue}
+    onChange={(e) => handleInputChange('venue', e.target.value)}
+    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:ring-2 focus:ring-orange-500"
+  />
+</div>
+
                 <div>
                   <label className="block text-gray-300 font-medium mb-2">Date</label>
                   <input type="date" value={formData.date} min={getTodayString()} onChange={(e) => handleInputChange('date', e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500" />
