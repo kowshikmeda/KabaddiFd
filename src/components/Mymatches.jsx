@@ -89,7 +89,7 @@ const MyMatches = () => {
           const response = await axios.get(baseURL + endpoint, {
             withCredentials: true,
           });
-          console.log('Fetched matches:', response.data);
+          //console.log('Fetched matches:', response.data);
           const transformedMatches = response.data.data.map(match => ({
             id: match._id,
             team1: { name: match.team1Name, score: match.team1Score, photo: match.team1Photo || `https://ui-avatars.com/api/?name=${match.team1Name.replace(/\s+/g, '+')}` },
