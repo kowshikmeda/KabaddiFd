@@ -214,7 +214,7 @@ const ScoreCard = () => {
               <Link to={"/"}> <Flame className="w-8 h-8 text-white" /></Link>
             </div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
-              KABADDI LEAGUE SCORECARD
+              GULLY KABADDI  MATCH SCORECARD
             </h1>
           </div>
         </div>

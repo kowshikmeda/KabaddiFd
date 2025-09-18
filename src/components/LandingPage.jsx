@@ -167,7 +167,7 @@ const LandingPage = () => {
                 </Link>
               </div>
               <h1 className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
-                KABADDI LEAGUE
+                GULLY KABADDI 
               </h1>
             </div>
 

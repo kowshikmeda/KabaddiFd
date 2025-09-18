@@ -71,15 +71,6 @@ const CreateMatch = () => {
     { value: 'all-rounder', label: 'All-Rounder', color: 'text-green-400' }
   ];
 
-  const venues = [
-    'Jawaharlal Nehru Indoor Stadium',
-    'Thyagaraj Sports Complex',
-    'Kanteerava Indoor Stadium',
-    'EKA Arena',
-    'Shree Shivchhatrapati Sports Complex',
-    'Gachibowli Indoor Stadium',
-  ];
-
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
