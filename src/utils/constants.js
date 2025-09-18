@@ -1,2 +1,2 @@
-export const baseURL = "http://localhost:5000/api";
-export const socketURL = "http://localhost:5000";
+export const baseURL = import.meta.env.MODE=="DEV"?"http://localhost:5000/api":"https://kabaddibackend.onrender.com/api" ;
+export const socketURL = import.meta.env.MODE=="DEV"?"http://localhost:5000": "https://kabaddibackend.onrender.com"

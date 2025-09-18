@@ -23,9 +23,9 @@ const Login = () => {
       },{withCredentials: true});
 
       localStorage.setItem('user', response.data.data.user.id);
-      alert('Login successful!');
      
-      console.log('Server response:', response.data);
+     
+      //console.log('Server response:', response.data);
       navigate("/");
 
     } catch (error) {

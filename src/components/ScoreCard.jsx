@@ -34,12 +34,12 @@ const ScoreCard = () => {
     const socket = io(socketURL, { transports: ['websocket', 'polling'] });
 
     socket.on('connect', () => {
-      console.log('🟢 Socket connected:', socket.id);
+      //console.log('🟢 Socket connected:', socket.id);
     });
 
     socket.on('matchUpdated', (data) => {
       if (data.id !== matchId) return;
-      console.log("update", data);
+      //console.log("update", data);
 
       const transformPlayers = (players) =>
         (players || []).map(p => ({
@@ -96,7 +96,7 @@ const ScoreCard = () => {
     });
 
     socket.on('disconnect', () => {
-      console.log('🔴 Socket disconnected');
+     // console.log('🔴 Socket disconnected');
     });
 
     return () => {

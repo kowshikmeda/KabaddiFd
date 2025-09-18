@@ -101,7 +101,7 @@ const PlayerProfile = () => {
   useEffect(() => {
     // Hardcoded ID for demonstration if not available from URL
     const playerId = id || 'some-player-id';
-  console.log("Fetching data for player ID:", playerId);
+    //console.log("Fetching data for player ID:", playerId);
     const fetchPlayerData = async () => {
       try {
         // Fetch both user and profile data in parallel
